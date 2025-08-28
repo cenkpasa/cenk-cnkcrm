@@ -1,0 +1,148 @@
+[
+  {
+    "title": "Kullanıcı & Rol Yönetimi (RBAC)",
+    "labels": [
+      "must",
+      "security",
+      "backend",
+      "frontend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nUygulamaya rol tabanlı yetkilendirme eklenmesi. Roller: `admin`, `muhasebe`, `saha`, `misafir`. \nHer rol için modül bazlı izin matrisi oluşturulacak (Mutabakat oluşturma, ERP çekme/push, konum görüntüleme, raporlama vb.).\n\n## Kapsam\n- Backend: JWT içinde rol/izin claim'leri\n- Frontend: Guard'lar; menü/aksiyonların rol bazlı gizlenmesi\n- DB: kullanıcı-roller-izinler şeması\n\n## Kabul Kriterleri\n- [ ] Yetkisiz kullanıcı ilgili sayfaya **URL ile de** erişemiyor (guard).\n- [ ] Menü ve butonlar rol/izne göre gizleniyor.\n- [ ] Varsayılan roller ve izin matrisi dokümante edildi."
+  },
+  {
+    "title": "Audit Log (Denetim Kaydı)",
+    "labels": [
+      "must",
+      "security",
+      "observability",
+      "backend",
+      "frontend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nTüm kritik işlemlerin denetim kaydı tutulması. Örn: mutabakat oluşturma, fatura ekleme/silme, ERP çekme/push.\n\n## Kapsam\n- DB tablo: `audit_logs(id, userId, action, entity, entityId, before, after, ts)`\n- Frontend yönetici ekranı: son 100 işlem listesi + filtreler\n\n## Kabul Kriterleri\n- [ ] Kritik aksiyonlar audit'e kaydediliyor.\n- [ ] Yönetici ekranında son işlemler listeleniyor ve filtreleniyor.\n- [ ] PII maskeleme (vergi no, tel) loglarda uygulanıyor."
+  },
+  {
+    "title": "Mutabakat İş Akışı (Durumlar + Not/İtiraz)",
+    "labels": [
+      "must",
+      "reconciliation",
+      "frontend",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nMutabakat kaydı durum bazlı ilerlemeli: `DRAFT → REVIEWED → APPROVED → SENT → REJECTED`. Not/itiraz alanı eklenecek.\n\n## Kapsam\n- Model: `status`, `note`, `rejectionReason`\n- UI: durum etiketi (renk kodlu), geçiş butonları\n- İş kuralları: yalnız yetkili rol geçiş yapabilsin\n\n## Kabul Kriterleri\n- [ ] Durum geçişleri rol bazlı kontrolle çalışıyor.\n- [ ] İtiraz geldiğinde kayıt `REJECTED` ve not tutuluyor.\n- [ ] Durumlar renk etiketleriyle ayırt ediliyor."
+  },
+  {
+    "title": "Mutabakat Dışa Aktarım (Excel/PDF)",
+    "labels": [
+      "should",
+      "reconciliation",
+      "reports",
+      "frontend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nSeçili mutabakatların Excel (`.xlsx`) ve PDF olarak dışa aktarılması. PDF'de logo, imza, dipnot alanları.\n\n## Kapsam\n- Excel: xlsx üretimi\n- PDF: şablon + şirket bilgileri\n- UI: grid toolbar'da \"Dışa Aktar\"\n\n## Kabul Kriterleri\n- [ ] Excel dosyası doğru kolonlarla iniyor.\n- [ ] PDF çıktısı logo, tarih, imza alanı içeriyor.\n- [ ] Çoklu seçimde tek dosyada sayfalandırma yapılabiliyor."
+  },
+  {
+    "title": "Gelişmiş Eşleştirme (Skor Bazlı/Fuzzy)",
+    "labels": [
+      "must",
+      "reconciliation",
+      "logic",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nTutar/tarih toleransına ek olarak seri-numara, unvan benzerliği ile skor tabanlı eşleştirme.\n\n## Kapsam\n- Skorlama: VergiNo(0.5) + Tutar(0.3) + Tarih(0.15) + SeriNo(0.05)\n- Eşik değeri ayarlanabilir\n- Öneri eşleşmeleri kullanıcı onayı ile kesinleşir\n\n## Kabul Kriterleri\n- [ ] Skor ≥ eşik ise \"öneri\" etiketiyle listeleniyor.\n- [ ] Kullanıcı manuel onaylamadan durum `APPROVED` olmaz.\n- [ ] Yanlış öneri iptal edilebiliyor (undo/ignore)."
+  },
+  {
+    "title": "ERP Import Session & Rollback",
+    "labels": [
+      "must",
+      "erp",
+      "backend",
+      "stability"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nERP'den çekilen her batch için import session kaydı; hata oluşursa atomic rollback.\n\n## Kapsam\n- DB: `import_sessions(id, adapter, from, to, total, success, errors[], ts)`\n- UI: session listesi + detay hata görüntüleme\n- Rollback: başarısız batch kalıcı kaydetmez\n\n## Kabul Kriterleri\n- [ ] Her import bir `sessionId` ile izleniyor.\n- [ ] Hatalı batch veritabanını kirletmiyor (rollback).\n- [ ] Session detay ekranında hata özetleri görülüyor."
+  },
+  {
+    "title": "ERP Idempotency & Push Güvenliği",
+    "labels": [
+      "must",
+      "erp",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nAynı mutabakatın birden çok kez ERP'ye push edilmesini önlemek için idempotency anahtarı.\n\n## Kapsam\n- Header: `Idempotency-Key: {mutabakatId}`\n- Sunucudan 200/204 'already pushed' durumunda UI sakin kalır\n\n## Kabul Kriterleri\n- [ ] Aynı mutabakat tekrar push edilmez.\n- [ ] UI'da 'gönderildi' rozeti gösterilir."
+  },
+  {
+    "title": "Offline-First Kuyruk & Arka Plan Senkron",
+    "labels": [
+      "must",
+      "pwa",
+      "frontend",
+      "stability"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nİnternetsiz modda işlemler `pendingActions` kuyruğuna alınır; bağlantı gelince Service Worker arka planda senkron yapar.\n\n## Kapsam\n- IndexedDB kuyruk\n- Exponential backoff\n- Çakışma çözümü: server-wins + diff gösterimi\n\n## Kabul Kriterleri\n- [ ] İnternet kesilip geldiğinde veri kaybı olmadan senkron tamamlanıyor.\n- [ ] Başarısız denemeler otomatik yeniden deneniyor.\n- [ ] Kullanıcıya net durum bildirimi sağlanıyor."
+  },
+  {
+    "title": "Bildirim Altyapısı (Push + E-posta)",
+    "labels": [
+      "should",
+      "notifications",
+      "frontend",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nMutabakat onayı/itirazı ve ERP hataları için push bildirimi ve e-posta gönderimi.\n\n## Kapsam\n- Push (Web Push API)\n- E-posta şablonları (Handlebars/MJML)\n- Deduplication ve sessize alma\n\n## Kabul Kriterleri\n- [ ] Tarayıcı bildirimi başarıyla iletiliyor.\n- [ ] E-posta şablonları değişkenlerle doluyor.\n- [ ] Tekrarlı bildirimler filtreleniyor."
+  },
+  {
+    "title": "Müşteri 360° Ekranı (Cari Kart)",
+    "labels": [
+      "should",
+      "crm",
+      "frontend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nCari kartı altında tüm geçmişin (faturalar, mutabakatlar, ziyaretler, notlar, konum) sekmeli gösterimi.\n\n## Kapsam\n- Sekmeler: Genel / Faturalar / Mutabakatlar / Ziyaretler / Dosyalar\n- Hızlı filtreler ve arama\n\n## Kabul Kriterleri\n- [ ] Tek ekrandan müşteriye ait tüm bilgiye ulaşılabiliyor.\n- [ ] Filtreleme/sıralama akıcı çalışıyor."
+  },
+  {
+    "title": "Ziyaret & Rota Takibi (KVKK Uyumlu)",
+    "labels": [
+      "should",
+      "pwa",
+      "maps",
+      "privacy"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nSaha ekibi için ziyaret başlat/bitir, not/foto ekleme ve sadece yöneticiye görünür günlük rota.\n\n## Kapsam\n- Konum izni ve KVKK rıza metni\n- Harita üzerinde rota çizimi\n\n## Kabul Kriterleri\n- [ ] Rota yönetici panelinde görselleştiriliyor.\n- [ ] Rıza olmadan konum toplanmıyor."
+  },
+  {
+    "title": "Veri Kalitesi & Normalizasyon",
+    "labels": [
+      "should",
+      "data-quality",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nVergi no, telefon, unvan standardizasyonu; aynı carinin farklı yazımlarının birleştirilmesi (canonical).\n\n## Kapsam\n- Normalize fonksiyonları (format/regex)\n- Merge stratejisi ve onay akışı\n\n## Kabul Kriterleri\n- [ ] İçe aktarmada tüm kayıtlar normalize ediliyor.\n- [ ] Aynı cariye ait varyasyonlar tek ID'ye bağlanıyor."
+  },
+  {
+    "title": "Health Dashboard (Durum İzleme)",
+    "labels": [
+      "should",
+      "observability",
+      "frontend",
+      "backend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nERP bağlantı ping, kuyruk uzunluğu, son senkron zamanı ve hata sayıları için sağlık ekranı.\n\n## Kapsam\n- /health endpoint\n- UI durum: yeşil/sarı/kırmızı\n\n## Kabul Kriterleri\n- [ ] Tek ekrandan sağlık durumu izlenebiliyor.\n- [ ] Kritik eşikler konfigüre edilebilir."
+  },
+  {
+    "title": "Hata Sınırları (Error Boundaries)",
+    "labels": [
+      "must",
+      "stability",
+      "frontend"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nBeklenmeyen React hatalarında uygulamanın çökmesini önlemek için global ve sayfa bazlı error boundary.\n\n## Kapsam\n- Global ErrorBoundary bileşeni\n- Sayfa bazlı sarmalayıcılar (Mutabakat, ERP)\n\n## Kabul Kriterleri\n- [ ] Hata ekranında kullanıcı dostu mesaj ve 'Tekrar dene' butonu var.\n- [ ] Konsol/telemetry tarafında stack izlenebiliyor."
+  },
+  {
+    "title": "Test & CI/CD (Lint + Unit + E2E)",
+    "labels": [
+      "must",
+      "ci-cd",
+      "quality"
+    ],
+    "body": "**Tarih:** 2025-08-28\n## Açıklama\nLint/format, unit ve e2e testlerin GitHub Actions ile zorunlu hale getirilmesi.\n\n## Kapsam\n- ESLint + Prettier\n- Vitest/RTL unit; Playwright e2e\n- Actions: build + test pipeline\n\n## Kabul Kriterleri\n- [ ] PR'lar testleri geçmeden merge edilemiyor.\n- [ ] Artefact olarak e2e raporu saklanıyor."
+  }
+]
