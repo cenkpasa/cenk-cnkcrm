@@ -9,15 +9,18 @@ interface AutomationResult {
 }
 
 class AutomationService {
-    private dataContext: DataContextType | null = null;
+    private dataContext: Pick<DataContextType, 'addTask'> | null = null;
 
-    public setDataContext(context: DataContextType): void {
+    public setDataContext(context: Pick<DataContextType, 'addTask'>): void {
         this.dataContext = context;
     }
 
     public async runAutomationsForStageChange(customerId: string, newStage: SalesFunnelStage, currentUserId: string): Promise<AutomationResult> {
         const results: AutomationResult = { notifications: [] };
-        if (!this.dataContext) return results;
+        if (!this.dataContext) {
+            console.warn("AutomationService: DataContext not set!");
+            return results;
+        };
 
         const customer = await db.customers.get(customerId);
         if (!customer) return results;

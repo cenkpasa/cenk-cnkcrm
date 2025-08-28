@@ -3,7 +3,7 @@ import EmptyState from './EmptyState';
 import Button from './Button';
 
 interface Column<T> {
-    header: string;
+    header: React.ReactNode;
     accessor: (item: T) => ReactNode;
     className?: string;
 }

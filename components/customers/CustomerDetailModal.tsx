@@ -17,10 +17,10 @@ interface CustomerDetailModalProps {
     setView: (view: ViewState) => void;
 }
 
-const InfoItem = ({ label, value }: { label: string, value?: string }) => (
+const InfoItem = ({ label, value }: { label: string, value?: string | number }) => (
     <div>
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="font-medium text-cnk-txt-primary-light">{value || '-'}</p>
+        <p className="text-xs text-cnk-txt-muted-light">{label}</p>
+        <p className="font-medium text-cnk-txt-secondary-light">{value ? String(value) : '-'}</p>
     </div>
 );
 

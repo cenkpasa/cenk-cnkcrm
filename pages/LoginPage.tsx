@@ -116,7 +116,7 @@ const LoginPage = () => {
                         <h2 className="text-xl text-slate-200 mb-2 text-center font-semibold">{t('forgotPassword')}</h2>
                         <p className="text-slate-300 text-sm mb-6 text-center">{t('forgotPasswordPrompt')}</p>
                         <form onSubmit={handleSendCode}>
-                           <Input variant="transparent" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('enterYourEmail')} required />
+                           <Input id="forgot-email" variant="transparent" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('enterYourEmail')} required />
                            <Button type="submit" isLoading={isLoading} variant="login" className="w-full !py-3">{t('sendResetCode')}</Button>
                            <button type="button" onClick={() => changeView('login')} className="block w-full text-center text-sm text-slate-300 mt-4 hover:underline">{t('backToLogin')}</button>
                         </form>
@@ -128,7 +128,7 @@ const LoginPage = () => {
                         <h2 className="text-xl text-slate-200 mb-2 text-center font-semibold">{t('verifyCode')}</h2>
                         <p className="text-slate-300 text-sm mb-6 text-center">{t('enterResetCode')}</p>
                         <form onSubmit={handleVerifyCode}>
-                            <Input variant="transparent" type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('verificationCode')} required />
+                            <Input id="verify-code" variant="transparent" type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('verificationCode')} required />
                             <Button type="submit" isLoading={isLoading} variant="login" className="w-full !py-3">{t('verifyCode')}</Button>
                         </form>
                     </>
@@ -138,8 +138,8 @@ const LoginPage = () => {
                      <>
                         <h2 className="text-xl text-slate-200 mb-2 text-center font-semibold">{t('setNewPassword')}</h2>
                         <form onSubmit={handleResetPassword}>
-                            <Input variant="transparent" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('newPassword')} required />
-                            <Input variant="transparent" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('confirmNewPassword')} required />
+                            <Input id="reset-new-password" variant="transparent" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('newPassword')} required />
+                            <Input id="reset-confirm-password" variant="transparent" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('confirmNewPassword')} required />
                             <Button type="submit" isLoading={isLoading} variant="login" className="w-full !py-3">{t('save')}</Button>
                         </form>
                     </>
@@ -150,8 +150,8 @@ const LoginPage = () => {
                     <>
                         <h2 className="text-2xl text-slate-200 mb-6 text-center font-bold tracking-wider">{t('loginFormTitle')}</h2>
                         <form onSubmit={handleLogin}>
-                            <Input variant="transparent" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('username')} required autoComplete="username" />
-                            <Input variant="transparent" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('password')} required autoComplete="current-password" />
+                            <Input id="login-username" variant="transparent" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('username')} required autoComplete="username" />
+                            <Input id="login-password" variant="transparent" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('password')} required autoComplete="current-password" />
                             <div className="flex items-center justify-between text-sm my-4">
                                 <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
                                     <input 

@@ -8,7 +8,9 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
-import Input from '../common/Input';
+import { generateReconciliationEmail, analyzeDisagreement } from '../../services/aiService';
+import Loader from '../common/Loader';
+
 
 interface ReconciliationModalProps {
     isOpen: boolean;
@@ -43,6 +45,11 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
 
     const isCreateMode = !reconciliation;
     const [isFetchingBalance, setIsFetchingBalance] = useState(false);
+    
+    const [aiEmail, setAiEmail] = useState('');
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [disagreementResponse, setDisagreementResponse] = useState('');
+    const [aiAnalysis, setAiAnalysis] = useState('');
 
     const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<ReconciliationFormData>();
     
@@ -51,6 +58,10 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
 
     useEffect(() => {
         if (isOpen) {
+            setAiEmail('');
+            setDisagreementResponse('');
+            setAiAnalysis('');
+
             if (isCreateMode) {
                 const now = new Date();
                 const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -69,6 +80,8 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
                     amount: reconciliation.amount,
                     notes: reconciliation.notes
                 });
+                setDisagreementResponse(reconciliation.customerResponse || '');
+                setAiAnalysis(reconciliation.aiAnalysis || '');
             }
         }
     }, [isOpen, reconciliation, isCreateMode, reset]);
@@ -96,14 +109,65 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
             onClose();
         }
     };
+    
+    const handleGenerateEmail = async () => {
+        const customerId = reconciliation?.customerId || watchedCustomerId;
+        const period = reconciliation?.period || watchedPeriod;
+        if (!customerId) return;
+        
+        setIsAiLoading(true);
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer) {
+            setIsAiLoading(false);
+            return;
+        }
+        
+        const type = reconciliation?.type || watch('type');
+        const amount = reconciliation?.amount || watch('amount');
+        
+        const result = await generateReconciliationEmail(customer, t(type), period, amount);
+        if (result.success) setAiEmail(result.text);
+        else showNotification('aiError', 'error');
+        
+        setIsAiLoading(false);
+    };
+    
+    const handleAnalyzeDisagreement = async () => {
+        if (!disagreementResponse || !reconciliation) return;
+        setIsAiLoading(true);
+        const result = await analyzeDisagreement(disagreementResponse);
+        if (result.success) {
+            setAiAnalysis(result.text);
+            await updateReconciliation(reconciliation.id, { aiAnalysis: result.text, customerResponse: disagreementResponse });
+            showNotification('Analiz başarıyla güncellendi.', 'success');
+        } else {
+             showNotification('aiError', 'error');
+        }
+        setIsAiLoading(false);
+    };
 
     const onSubmit: SubmitHandler<ReconciliationFormData> = async (data) => {
         try {
-            await addReconciliation(data);
+            const newReconciliationId = await addReconciliation(data);
             showNotification('Mutabakat kaydı oluşturuldu.', 'success');
+            if (aiEmail) {
+                await updateReconciliation(newReconciliationId, { lastEmailSent: new Date().toISOString() });
+                 openMailClient(data.customerId, data.type, data.period);
+            }
             onClose();
         } catch (error) {
             showNotification('genericError', 'error');
+        }
+    };
+    
+    const openMailClient = (customerId: string, type: ReconciliationType, period: string) => {
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer || !customer.email) return;
+        const subject = `${t(type)} Mutabakatı - ${period}`;
+        const mailto = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(aiEmail)}`;
+        window.open(mailto, '_blank');
+        if (reconciliation) {
+            updateReconciliation(reconciliation.id, { lastEmailSent: new Date().toISOString() });
         }
     };
     
@@ -141,6 +205,14 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
                 <label className="mb-2 block text-sm font-semibold">{t('notes')}</label>
                 <textarea {...register('notes')} rows={3} className="w-full rounded-lg border border-cnk-border-light bg-cnk-bg-light p-2" />
             </div>
+             <fieldset className="border-t pt-4">
+                <Button type="button" onClick={handleGenerateEmail} isLoading={isAiLoading} icon="fas fa-robot">{t('aiGenerateEmail')}</Button>
+                {(aiEmail || isAiLoading) && (
+                    <div className="mt-2">
+                        {isAiLoading ? <Loader /> : <textarea value={aiEmail} onChange={e => setAiEmail(e.target.value)} rows={8} className="w-full p-2 border rounded-md bg-cnk-bg-light" />}
+                    </div>
+                )}
+            </fieldset>
         </form>
     );
     
@@ -159,6 +231,21 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
                 {reconciliation.notes && (
                     <div><p className="text-sm text-cnk-txt-muted-light">{t('notes')}</p><p className="p-2 border rounded-md bg-white">{reconciliation.notes}</p></div>
                 )}
+
+                 {reconciliation.status === 'disagreed' && (
+                        <fieldset className="bg-red-500/10 p-4 rounded-lg border border-red-500/20">
+                            <legend className="font-semibold text-red-700 px-2">{t('disagreementDetails')}</legend>
+                            <label htmlFor="customerResponse" className="font-semibold text-sm">{t('customerResponse')}</label>
+                            <textarea id="customerResponse" value={disagreementResponse} onChange={(e) => setDisagreementResponse(e.target.value)} rows={3} className="w-full mt-1 p-2 border rounded-md" />
+                            <Button onClick={handleAnalyzeDisagreement} isLoading={isAiLoading} icon="fas fa-robot" className="mt-2">{t('aiAnalyzeDisagreement')}</Button>
+                            {(aiAnalysis || isAiLoading) && 
+                                <div className="mt-2 p-3 bg-blue-500/10 rounded-md whitespace-pre-wrap border border-blue-500/20">
+                                    <h4 className="font-bold text-blue-700">{t('aiAnalysis')}:</h4>
+                                    {isAiLoading ? <Loader size="sm" /> : <p className="text-sm">{aiAnalysis}</p>}
+                                </div>
+                            }
+                        </fieldset>
+                    )}
             </div>
         );
     };
@@ -172,12 +259,12 @@ const ReconciliationModal = ({ isOpen, onClose, reconciliation }: Reconciliation
         }
         if (reconciliation?.status === 'pending') {
             return <>
-                <Button variant="secondary" onClick={() => { showNotification('Email gönderme özelliği yakında eklenecek.', 'info')}}>E-posta Gönder</Button>
+                <Button variant="secondary" onClick={handleGenerateEmail} isLoading={isAiLoading}>E-posta Oluştur</Button>
                 <Button variant="danger" onClick={() => handleStatusUpdate('disagreed')}>Anlaşılmadı</Button>
                 <Button variant="success" onClick={() => handleStatusUpdate('agreed')}>Anlaşıldı</Button>
             </>;
         }
-        return <Button variant="secondary" onClick={onClose}>{t('cancel')}</Button>;
+        return <Button variant="secondary" onClick={onClose}>{t('close')}</Button>;
     };
 
     return (

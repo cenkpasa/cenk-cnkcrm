@@ -1,16 +1,12 @@
 // This file was previously TechnicalForms.tsx and has been repurposed for the new Reconciliation module.
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useReconciliation } from '../contexts/ReconciliationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Reconciliation, ReconciliationStatus, ReconciliationType } from '../types';
+import { Reconciliation, ReconciliationStatus } from '../types';
 import { useData } from '../contexts/DataContext';
-import { useErp } from '../contexts/ErpContext';
 import Button from '../components/common/Button';
 import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
-import Input from '../components/common/Input';
-import { generateReconciliationEmail, analyzeDisagreement } from '../services/aiService';
-import Loader from '../components/common/Loader';
+import ReconciliationModal from '../components/reconciliation/ReconciliationModal';
 
 const ReconciliationPage = () => {
     const { t } = useLanguage();
@@ -31,12 +27,32 @@ const ReconciliationPage = () => {
     };
     
     const columns = [
-        { headerKey: 'customer', accessor: (item: Reconciliation) => customers.find(c => c.id === item.customerId)?.name || 'Bilinmeyen' },
-        { headerKey: 'type', accessor: (item: Reconciliation) => t(item.type) },
-        { headerKey: 'period', accessor: (item: Reconciliation) => item.period },
-        { headerKey: 'amount', accessor: (item: Reconciliation) => `${item.amount.toLocaleString('tr-TR')} TL` },
-        { headerKey: 'status', accessor: (item: Reconciliation) => <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[item.status]}`}>{t(item.status)}</span>},
-        { headerKey: 'actions', accessor: (item: Reconciliation) => <Button size="sm" onClick={() => handleOpenModal(item)}>{t('details')}</Button> }
+        { 
+            header: t('customer'), 
+            accessor: (item: Reconciliation) => {
+                const customer = customers.find(c => c.id === item.customerId);
+                return String(customer?.name || t('unknownCustomer'));
+            }
+        },
+        { header: t('type'), accessor: (item: Reconciliation) => t(item.type) },
+        { header: t('period'), accessor: (item: Reconciliation) => item.period },
+        { header: t('amount'), accessor: (item: Reconciliation) => `${item.amount.toLocaleString('tr-TR')} TL` },
+        { 
+            header: t('status'), 
+            accessor: (item: Reconciliation) => (
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[item.status]}`}>
+                    {t(item.status)}
+                </span>
+            )
+        },
+        { 
+            header: t('actions'), 
+            accessor: (item: Reconciliation) => (
+                <Button size="sm" onClick={() => handleOpenModal(item)}>
+                    {t('details')}
+                </Button>
+            )
+        }
     ];
 
     return (
@@ -45,7 +61,7 @@ const ReconciliationPage = () => {
                 <h1 className="text-2xl font-bold">{t('reconciliations')}</h1>
                 <Button onClick={() => handleOpenModal(null)} icon="fas fa-plus">{t('createReconciliation')}</Button>
             </div>
-            <DataTable columns={columns.map(c => ({...c, header: t(c.headerKey)}))} data={reconciliations} emptyStateMessage={t('noReconciliationYet')} />
+            <DataTable columns={columns} data={reconciliations} emptyStateMessage={t('noReconciliationYet')} />
             {isModalOpen && (
                 <ReconciliationModal 
                     isOpen={isModalOpen} 
@@ -54,162 +70,6 @@ const ReconciliationPage = () => {
                 />
             )}
         </div>
-    );
-};
-
-const ReconciliationModal = ({ isOpen, onClose, reconciliation }: { isOpen: boolean, onClose: () => void, reconciliation: Reconciliation | null }) => {
-    const { t } = useLanguage();
-    const { addReconciliation, updateReconciliation } = useReconciliation();
-    const { customers } = useData();
-    const { invoices } = useErp();
-    
-    const [formData, setFormData] = useState({
-        customerId: reconciliation?.customerId || '',
-        type: reconciliation?.type || 'current_account' as ReconciliationType,
-        period: reconciliation?.period || new Date().toISOString().slice(0, 7),
-        amount: reconciliation?.amount || 0,
-        notes: reconciliation?.notes || '',
-    });
-    
-    const [aiEmail, setAiEmail] = useState('');
-    const [isAiLoading, setIsAiLoading] = useState(false);
-    const [disagreementResponse, setDisagreementResponse] = useState(reconciliation?.customerResponse || '');
-    const [aiAnalysis, setAiAnalysis] = useState(reconciliation?.aiAnalysis || '');
-
-    useEffect(() => {
-        if (!reconciliation && formData.customerId) {
-            const customerInvoices = invoices.filter(inv => inv.customerId === formData.customerId);
-            const totalAmount = customerInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-            setFormData(p => ({ ...p, amount: totalAmount }));
-        }
-    }, [formData.customerId, invoices, reconciliation]);
-
-    const handleGenerateEmail = async () => {
-        if(!formData.customerId) return;
-        setIsAiLoading(true);
-        const customer = customers.find(c => c.id === formData.customerId);
-        if(!customer) {
-            setIsAiLoading(false);
-            return;
-        }
-        const result = await generateReconciliationEmail(customer, t(formData.type), formData.period, formData.amount);
-        if(result.success) setAiEmail(result.text);
-        setIsAiLoading(false);
-    };
-
-    const handleAnalyzeDisagreement = async () => {
-        if(!disagreementResponse || !reconciliation) return;
-        setIsAiLoading(true);
-        const result = await analyzeDisagreement(disagreementResponse);
-        if(result.success) {
-            setAiAnalysis(result.text);
-            await updateReconciliation(reconciliation.id, { aiAnalysis: result.text, customerResponse: disagreementResponse });
-        }
-        setIsAiLoading(false);
-    };
-
-    const handleSubmit = async () => {
-        if(reconciliation) {
-            await updateReconciliation(reconciliation.id, formData);
-        } else {
-            await addReconciliation(formData);
-        }
-        onClose();
-    };
-    
-    const handleStatusUpdate = async (status: ReconciliationStatus) => {
-        if(!reconciliation) return;
-        await updateReconciliation(reconciliation.id, { status });
-        onClose();
-    };
-
-    const openMailClient = () => {
-        const customer = customers.find(c => c.id === (reconciliation?.customerId || formData.customerId));
-        if(!customer || !customer.email) return;
-        const subject = `${t(formData.type)} Mutabakatı - ${formData.period}`;
-        const mailto = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(aiEmail)}`;
-        window.open(mailto, '_blank');
-        if(reconciliation) {
-            updateReconciliation(reconciliation.id, { lastEmailSent: new Date().toISOString() });
-        }
-    };
-    
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={reconciliation ? t('reconciliationDetails') : t('createReconciliation')} size="3xl">
-            {reconciliation ? (
-                // Detail/Update View
-                <div className="space-y-4">
-                     <div className="bg-cnk-bg-light p-4 rounded-lg grid grid-cols-2 gap-4">
-                        <p><strong>{t('customer')}:</strong> {customers.find(c => c.id === reconciliation.customerId)?.name}</p>
-                        <p><strong>{t('period')}:</strong> {reconciliation.period}</p>
-                        <p><strong>{t('type')}:</strong> {t(reconciliation.type)}</p>
-                        <p><strong>{t('amount')}:</strong> {reconciliation.amount.toLocaleString('tr-TR')} TL</p>
-                        <p className="col-span-2"><strong>{t('status')}:</strong> {t(reconciliation.status)}</p>
-                     </div>
-                    
-                    {reconciliation.status === 'pending' && (
-                        <div className="flex gap-2 p-4 border-t">
-                           <Button variant="success" onClick={() => handleStatusUpdate('agreed')} icon="fas fa-check">{t('agree')}</Button>
-                           <Button variant="danger" onClick={() => handleStatusUpdate('disagreed')} icon="fas fa-times">{t('disagree')}</Button>
-                        </div>
-                    )}
-
-                    {reconciliation.status === 'disagreed' && (
-                        <fieldset className="bg-red-500/10 p-4 rounded-lg border border-red-500/20">
-                            <legend className="font-semibold text-red-700 px-2">{t('disagreementDetails')}</legend>
-                            <label htmlFor="customerResponse" className="font-semibold text-sm">{t('customerResponse')}</label>
-                            <textarea id="customerResponse" value={disagreementResponse} onChange={(e) => setDisagreementResponse(e.target.value)} rows={3} className="w-full mt-1 p-2 border rounded-md" />
-                            <Button onClick={handleAnalyzeDisagreement} isLoading={isAiLoading} icon="fas fa-robot" className="mt-2">{t('aiAnalyzeDisagreement')}</Button>
-                            {(aiAnalysis || isAiLoading) && 
-                                <div className="mt-2 p-3 bg-blue-500/10 rounded-md whitespace-pre-wrap border border-blue-500/20">
-                                    <h4 className="font-bold text-blue-700">{t('aiAnalysis')}:</h4>
-                                    {isAiLoading ? <Loader size="sm" /> : <p className="text-sm">{aiAnalysis}</p>}
-                                </div>
-                            }
-                        </fieldset>
-                    )}
-                </div>
-            ) : (
-                // Create View
-                <div className="space-y-4">
-                    <div>
-                        <label className="font-semibold">{t('customer')}</label>
-                        <select value={formData.customerId} onChange={e => setFormData(p => ({...p, customerId: e.target.value}))} className="w-full mt-1 p-2 border rounded-md bg-cnk-bg-light">
-                            <option value="">{t('select')}</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <Input label={t('period')} type="month" value={formData.period} onChange={e => setFormData(p => ({...p, period: e.target.value}))} />
-                        <Input label={t('amount')} type="number" value={String(formData.amount)} onChange={e => setFormData(p => ({...p, amount: parseFloat(e.target.value) || 0}))} />
-                        <div>
-                             <label className="font-semibold">{t('type')}</label>
-                             <select value={formData.type} onChange={e => setFormData(p => ({...p, type: e.target.value as ReconciliationType}))} className="w-full mt-1 p-2 border rounded-md bg-cnk-bg-light">
-                                <option value="current_account">{t('current_account')}</option>
-                                <option value="ba">{t('ba')}</option>
-                                <option value="bs">{t('bs')}</option>
-                            </select>
-                        </div>
-                    </div>
-                     <fieldset className="border-t pt-4">
-                        <Button onClick={handleGenerateEmail} isLoading={isAiLoading} icon="fas fa-robot">{t('aiGenerateEmail')}</Button>
-                        {(aiEmail || isAiLoading) && (
-                            <div className="mt-2">
-                                {isAiLoading ? <Loader /> : (
-                                <>
-                                    <textarea value={aiEmail} onChange={e => setAiEmail(e.target.value)} rows={8} className="w-full p-2 border rounded-md bg-cnk-bg-light" />
-                                    <Button onClick={openMailClient} icon="fas fa-paper-plane" className="mt-2">{t('sendWithEmailClient')}</Button>
-                                </>
-                                )}
-                            </div>
-                        )}
-                    </fieldset>
-                    <div className="flex justify-end border-t pt-4">
-                        <Button onClick={handleSubmit}>{t('save')}</Button>
-                    </div>
-                </div>
-            )}
-        </Modal>
     );
 };
 

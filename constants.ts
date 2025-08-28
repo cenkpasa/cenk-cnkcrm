@@ -292,7 +292,10 @@ export const MESSAGES: Record<string, Record<string, string>> = {
         'rejected': 'Reddedildi',
         'pending': 'Beklemede',
         'leaveRequestSent': 'İzin talebiniz başarıyla gönderildi ve onaya sunuldu.',
-        
+        'leaveRequestManagement': 'Bekleyen İzin Talepleri',
+        'approve': 'Onayla',
+        'reject': 'Reddet',
+
         // --- Interview Form ---
         'interviewForm': 'Görüşme Formu',
         'addInterview': 'Yeni Görüşme Ekle',
@@ -502,7 +505,9 @@ export const MESSAGES: Record<string, Record<string, string>> = {
         'avgConversionTime': 'Avg. Conversion Time',
         'avgSuccessfulOfferAmount': 'Avg. Successful Offer Amount',
         'totalAnalyses': 'Total Analyses',
-        
+        'highWinProbability': 'Yüksek Kazanma Olasılığı',
+        'atRiskCustomers': 'Risk Altındaki Müşteriler',
+
         // --- Tasks ---
         'taskTitle': 'Görev Başlığı',
         'dueDate': 'Bitiş Tarihi',
@@ -666,7 +671,8 @@ export const MESSAGES: Record<string, Record<string, string>> = {
         'leaveRequestSent': 'Your leave request has been successfully submitted for approval.',
         'pending': 'Pending',
         'appointmentReminder': 'Your appointment "{title}" with {customer} starts at {time}.',
-
+        'highWinProbability': 'High-Win Probability',
+        'atRiskCustomers': 'At-Risk Customers',
 
         // ... continue for all other keys in English
         'userCount': '{count} Users',

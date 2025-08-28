@@ -1,6 +1,7 @@
 
 
-import React, { createContext, useContext, ReactNode } from 'react';
+
+import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Customer, Appointment, Interview, Offer, Task, SalesFunnelStage } from '../types';
 import { db } from '../services/dbService';
@@ -51,6 +52,28 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     const interviews = useLiveQuery(() => db.interviews.toArray(), []) || [];
     const offers = useLiveQuery(() => db.offers.toArray(), []) || [];
     const tasks = useLiveQuery(() => db.tasks.orderBy('dueDate').toArray(), []) || [];
+
+    // Task Actions
+    const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
+        const newTask: Task = {
+            ...taskData,
+            id: uuidv4(),
+            createdAt: new Date().toISOString()
+        };
+        await db.tasks.add(newTask);
+        addNotification({
+            messageKey: 'activityTaskAdded',
+            replacements: { title: newTask.title },
+            type: 'system',
+            link: { page: 'tasks' }
+        });
+    };
+
+    // Initialize automation service with necessary context methods
+    useEffect(() => {
+        automationService.setDataContext({ addTask });
+    }, [addTask]);
+
 
     // Customer Actions
     const addCustomer = async (customerData: Omit<Customer, 'id' | 'createdAt'>): Promise<string> => {
@@ -187,22 +210,6 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         }
         return offersToAdd.length;
     }
-
-    // Task Actions
-    const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
-        const newTask: Task = {
-            ...taskData,
-            id: uuidv4(),
-            createdAt: new Date().toISOString()
-        };
-        await db.tasks.add(newTask);
-        addNotification({
-            messageKey: 'activityTaskAdded',
-            replacements: { title: newTask.title },
-            type: 'system',
-            link: { page: 'tasks' }
-        });
-    };
 
     const updateTask = async (updatedTask: Task) => {
         await db.tasks.put(updatedTask);

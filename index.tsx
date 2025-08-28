@@ -36,7 +36,7 @@ const AppInitializer: React.FC = () => {
         if ('serviceWorker' in navigator && isSecureOrigin) {
           // HTML'de önerdiğimiz yol ile tutarlı
           navigator.serviceWorker
-            .register('/sw.js')
+            .register('/service-worker.js')
             .then((reg) => {
               console.log('Service Worker kaydı başarılı:', reg.scope);
             })
